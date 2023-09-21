@@ -12,7 +12,7 @@ pub fn main() !void {
         try stdout.writeAll("Usage: loxz [script]\n");
         std.process.exit(64);
     } else if (args.len == 2) {
-        try lox.runFile(&arena, args[0]);
+        try lox.runFile(&arena, args[1]);
     } else {
         try lox.runPrompt(&arena);
     }

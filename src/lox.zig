@@ -13,6 +13,10 @@ pub fn run(arena: *ArenaAllocator, source: []u8) !void {
     var scanner = Scanner.init(ally, source);
     defer scanner.deinit();
     try scanner.scanTokens();
+
+    // for (scanner.tokens.items) |token| {
+    //     std.debug.print("{?}\n", .{token});
+    // }
 }
 
 pub fn generateError(line: u16, message: []const u8) !void {
@@ -32,16 +36,9 @@ pub fn runPrompt(arena: *ArenaAllocator) !void {
 
     while (true) {
         const arena_state = arena.state; // Begin temporary mem
-        defer arena.state = arena_state; // End after each iteration or break
-
+        defer arena.state = arena_state; // End temporary mem
         try stdout.writeAll("> ");
-        var line: []u8 = undefined;
-        if (builtin.target.os.tag == .windows) {
-            line = (try stdin.readUntilDelimiterOrEofAlloc(ally, '\r', 1024 * 4)) orelse unreachable;
-            try stdin.skipBytes(1, .{}); // Eat newline
-        } else if (builtin.target.os.tag == .linux) {
-            line = (try stdin.readUntilDelimiterOrEofAlloc(ally, '\n', 1024 * 4)) orelse unreachable;
-        }
+        var line = (try stdin.readUntilDelimiterOrEofAlloc(ally, '\n', 1024 * 4)) orelse unreachable;
         if (line.len == 0) break;
         try run(arena, line);
         had_error = false;

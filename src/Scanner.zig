@@ -8,21 +8,44 @@ const ArrayList = std.ArrayList;
 
 const Token = token.Token;
 const TokenType = token.TokenType;
+const Literal = token.Literal;
 
 const Scanner = @This();
+
+const hashString = std.hash_map.hashString;
 
 ally: Allocator,
 tokens: ArrayList(Token),
 source: []const u8,
+keywords: std.AutoHashMap(u64, TokenType),
 start: u16,
 current: u16,
 line: u16,
 
 pub fn init(ally: Allocator, source: []const u8) Scanner {
+    var keywords = std.AutoHashMap(u64, TokenType).init(ally);
+    keywords.put(hashString("and"), .@"and") catch unreachable;
+    keywords.put(hashString("class"), .class) catch unreachable;
+    keywords.put(hashString("else"), .@"else") catch unreachable;
+    keywords.put(hashString("false"), .false) catch unreachable;
+    keywords.put(hashString("fun"), .fun) catch unreachable;
+    keywords.put(hashString("for"), .@"for") catch unreachable;
+    keywords.put(hashString("if"), .@"if") catch unreachable;
+    keywords.put(hashString("nil"), .nil) catch unreachable;
+    keywords.put(hashString("or"), .@"or") catch unreachable;
+    keywords.put(hashString("print"), .print) catch unreachable;
+    keywords.put(hashString("return"), .@"return") catch unreachable;
+    keywords.put(hashString("super"), .super) catch unreachable;
+    keywords.put(hashString("this"), .this) catch unreachable;
+    keywords.put(hashString("true"), .true) catch unreachable;
+    keywords.put(hashString("var"), .@"var") catch unreachable;
+    keywords.put(hashString("while"), .@"while") catch unreachable;
+
     return Scanner{
         .ally = ally,
         .tokens = ArrayList(Token).init(ally),
         .source = source,
+        .keywords = keywords,
         .start = 0,
         .current = 0,
         .line = 1,
@@ -52,7 +75,7 @@ fn addToken(self: *Scanner, token_type: TokenType) !void {
     });
 }
 
-fn addTokenWithLiteral(self: *Scanner, token_type: TokenType, literal: []const u8) !void {
+fn addTokenWithLiteral(self: *Scanner, token_type: TokenType, literal: Literal) !void {
     try self.tokens.append(Token{
         .type = token_type,
         .lexeme = try self.ally.dupe(u8, self.source[self.start..self.current]),
@@ -67,6 +90,12 @@ fn match(self: *Scanner, expected: u8) bool {
 
     self.current += 1;
     return true;
+}
+
+fn peekNext(self: *Scanner) u8 {
+    if (self.current + 1 >= self.source.len)
+        return 0;
+    return self.source[self.current + 1];
 }
 
 fn peek(self: *Scanner) u8 {
@@ -91,15 +120,37 @@ fn string(self: *Scanner) !void {
 
     try self.addTokenWithLiteral(
         .string,
-        try self.ally.dupe(
-            u8,
-            self.source[self.start + 1 .. self.current - 1],
-        ),
+        Literal{ .string = try self.ally.dupe(u8, self.source[self.start + 1 .. self.current - 1]) },
     );
 }
 
+fn identifier(self: *Scanner) !void {
+    while (std.ascii.isAlphanumeric(self.peek()) or self.peek() == '_') _ = self.advance();
+
+    var token_type = self.keywords.get(hashString(self.source[self.start..self.current]));
+    if (token_type == null) token_type = .identifier;
+    try self.addToken(token_type.?);
+}
+
+fn number(self: *Scanner) !void {
+    while (std.ascii.isDigit(self.peek()))
+        _ = self.advance();
+
+    if (self.peek() == '.' and std.ascii.isDigit(self.peekNext())) {
+        _ = self.advance(); // Consume '.'
+
+        while (std.ascii.isDigit(self.peek()))
+            _ = self.advance();
+    }
+
+    try self.addTokenWithLiteral(.number, Literal{
+        .number = try std.fmt.parseFloat(f64, self.source[self.start..self.current]),
+    });
+}
+
 fn scanToken(self: *Scanner) !void {
-    switch (self.advance()) {
+    const c = self.advance();
+    switch (c) {
         // Single-character tokens.
         '(' => try self.addToken(.left_paren),
         ')' => try self.addToken(.right_paren),
@@ -128,8 +179,9 @@ fn scanToken(self: *Scanner) !void {
         '>' => try self.addToken(if (self.match('=')) .greater_equal else .greater),
         '<' => try self.addToken(if (self.match('=')) .less_equal else .less),
 
-        // Strings
         '"' => try self.string(),
+        '0'...'9' => try self.number(),
+        'A'...'Z', 'a'...'z', '_' => try self.identifier(),
 
         else => try lox.generateError(self.line, "Unexpected character."),
     }
