@@ -21,7 +21,7 @@ pub fn generateError(line: u16, message: []const u8) !void {
 
 pub fn report(line: u16, error_description: []const u8, message: []const u8) !void {
     const stdout = std.io.getStdOut().writer();
-    try stdout.print("[Line {d}] Error {s} : {s}", .{ line, error_description, message });
+    try stdout.print("[Line {d}] Error {s}: {s}\n", .{ line, error_description, message });
     had_error = true;
 }
 
@@ -32,7 +32,7 @@ pub fn runPrompt(arena: *ArenaAllocator) !void {
 
     while (true) {
         const arena_state = arena.state; // Begin temporary mem
-        defer arena.state = arena_state; // Reclaim on break (not that it really matters)
+        defer arena.state = arena_state; // End after each iteration or break
 
         try stdout.writeAll("> ");
         var line: []u8 = undefined;
@@ -45,8 +45,6 @@ pub fn runPrompt(arena: *ArenaAllocator) !void {
         if (line.len == 0) break;
         try run(arena, line);
         had_error = false;
-
-        arena.state = arena_state; // End temporary mem
     }
 }
 

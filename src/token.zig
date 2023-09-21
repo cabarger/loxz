@@ -48,11 +48,9 @@ pub const TokenType = enum {
     eof,
 };
 
-pub const Literal = struct {};
-
 pub const Token = struct {
     type: TokenType,
     lexeme: []const u8,
-    literal: ?Literal,
+    literal: ?[]const u8,
     line: u16,
 };
